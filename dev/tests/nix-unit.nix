@@ -464,4 +464,68 @@ in
       expected = "dogfood";
     };
   };
+
+  formatter = {
+    "test: conditional null throws helpful error" = {
+      expr =
+        let
+          result = mkFlake { inputs.self = { }; } {
+            systems = [ "x86_64-linux" "aarch64-darwin" ];
+            perSystem = { system, ... }: {
+              formatter =
+                if system == "x86_64-linux" then
+                  derivation { name = "fmt"; builder = "x"; system = system; }
+                else null;
+            };
+          };
+        in
+        result.formatter.aarch64-darwin;
+      expectedError.type = "ThrownError";
+      expectedError.msg = "could not determine statically(.|\n)*disabledModules(.|\n)*inputs\\.flake-parts\\.modules\\.formatter";
+    };
+
+    "test: empty when never defined" = {
+      expr =
+        let
+          result = mkFlake { inputs.self = { }; } {
+            systems = [ "x86_64-linux" "aarch64-darwin" ];
+            perSystem = { ... }: { };
+          };
+        in
+        result.formatter == { };
+      expected = true;
+    };
+
+    "test: present for all systems" = {
+      expr =
+        let
+          result = mkFlake { inputs.self = { }; } {
+            systems = [ "x86_64-linux" "aarch64-darwin" ];
+            perSystem = { system, ... }: {
+              formatter = derivation { name = "fmt"; builder = "x"; inherit system; };
+            };
+          };
+        in
+        result ? formatter && result.formatter ? x86_64-linux && result.formatter ? aarch64-darwin;
+      expected = true;
+    };
+
+    "test: lazy per-system" = {
+      expr =
+        let
+          result = mkFlake { inputs.self = { }; } {
+            systems = [ "x86_64-linux" "aarch64-darwin" ];
+            perSystem = { system, ... }: {
+              formatter =
+                if system == "x86_64-linux" then
+                  derivation { name = "fmt"; builder = "x"; system = system; }
+                else
+                  throw "should not evaluate aarch64-darwin formatter";
+            };
+          };
+        in
+        result.formatter.x86_64-linux.name;
+      expected = "fmt";
+    };
+  };
 }
