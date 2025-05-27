@@ -583,7 +583,7 @@ in
         in
         result.formatter.aarch64-darwin;
       expectedError.type = "ThrownError";
-      expectedError.msg = "could not determine statically(.|\n)*disabledModules(.|\n)*inputs\\.flake-parts\\.modules\\.formatter";
+      expectedError.msg = "could not determine statically(.|\n)*touchup\\.attr\\.formatter\\.enable = false";
     };
 
     "test: empty when never defined" = {
