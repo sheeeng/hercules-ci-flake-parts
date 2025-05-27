@@ -51,6 +51,7 @@
         modules = ./extras/modules.nix;
         partitions = ./extras/partitions.nix;
         bundlers = ./extras/bundlers.nix;
+        touchup = ./extras/touchup.nix;
       };
     in
     lib.mkFlake { inherit inputs; } {

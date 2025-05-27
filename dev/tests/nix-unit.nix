@@ -30,6 +30,14 @@ let
       };
     };
 
+  # Replace derivations with a simple attrset so nix-unit can compare without
+  # hitting stack overflow on self-referential derivation attrsets.
+  # See NOTE: Derivation comparison
+  canon = v:
+    if v.type or null == "derivation" then { type = "derivation"; inherit (v) drvPath outPath name system; }
+    else if builtins.isAttrs v then builtins.mapAttrs (_: canon) v
+    else v;
+
   empty = mkFlake
     { inputs.self = { }; }
     {
@@ -462,6 +470,100 @@ in
     "test: importAndPublish consumer" = {
       expr = dogfoodConsumer.marker;
       expected = "dogfood";
+    };
+  };
+
+  touchup = {
+    "test: any filter keeps only matching attrs" = {
+      expr =
+        let
+          result = mkFlake { inputs.self = { }; } {
+            imports = [ flake-parts.flakeModules.touchup ];
+            systems = [ "x86_64-linux" "aarch64-darwin" ];
+            touchup.any = { attrName, ... }: { enable = attrName == "overlays"; };
+            perSystem = { ... }: {
+              packages.default = throw "packages.default should not be evaluated";
+              packages.hello = throw "packages.hello should not be evaluated";
+            };
+          };
+        in
+        result;
+      expected = {
+        overlays = { };
+      };
+    };
+
+    "test: any with mkDefault, attr override" = {
+      expr =
+        let
+          result = mkFlake { inputs.self = { }; } {
+            imports = [ flake-parts.flakeModules.touchup ];
+            systems = [ "x86_64-linux" "aarch64-darwin" ];
+            touchup.any = { ... }: { enable = lib.mkDefault false; };
+            touchup.attr.overlays = { enable = true; };
+            perSystem = { ... }: {
+              packages.default = throw "packages.default should not be evaluated";
+              packages.hello = throw "packages.hello should not be evaluated";
+            };
+          };
+        in
+        result;
+      expected = {
+        overlays = { };
+      };
+    };
+
+    "test: nested attr filtering per system" = {
+      expr =
+        let
+          result = mkFlake { inputs.self = { }; } {
+            imports = [ flake-parts.flakeModules.touchup ];
+            systems = [ "x86_64-linux" "aarch64-darwin" ];
+            touchup.attr.packages.attr.aarch64-darwin.attr.bar.enable = false;
+            perSystem = { system, ... }: {
+              packages.foo = pkg system "foo";
+              # This assertion proves the filtered value is never evaluated for darwin
+              packages.bar = assert system == "x86_64-linux"; pkg system "bar";
+            };
+          };
+        in
+        canon result.packages;
+      expected = canon {
+        aarch64-darwin = { foo = pkg "aarch64-darwin" "foo"; };
+        x86_64-linux = { foo = pkg "x86_64-linux" "foo"; bar = pkg "x86_64-linux" "bar"; };
+      };
+    };
+
+    "test: finish and attr composition" = {
+      expr =
+        mkFlake { inputs.self = { }; } {
+          imports = [ flake-parts.flakeModules.touchup ];
+          systems = [ "x86_64-linux" "aarch64-darwin" ];
+          touchup.any = { ... }: { enable = lib.mkDefault false; };
+          touchup.attr.overlays = { enable = true; finish = x: "hoi"; };
+          touchup.finish = x: x // { foo = "bar"; };
+        };
+      expected = {
+        overlays = "hoi";
+        foo = "bar";
+      };
+    };
+
+    # TODO: assert that the error context ("while touching up attribute 'broken'")
+    # appears in the trace. nix-unit's expectedError.msg only matches the thrown
+    # message, not addErrorContext frames.
+    "test: error context when enabled attr throws" = {
+      expr =
+        let
+          result = mkFlake { inputs.self = { }; } {
+            imports = [ flake-parts.flakeModules.touchup ];
+            systems = [ "x86_64-linux" ];
+            flake.broken = throw "the value is broken";
+          };
+        in
+        result.broken;
+      expectedError.type = "ThrownError";
+      expectedError.msg = "the value is broken";
     };
   };
 
