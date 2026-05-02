@@ -1,0 +1,424 @@
+# Tests in nix-unit format, ported from eval-tests.nix
+# Run with:
+#   nix-unit --flake .#tests
+# or:
+#   nix build .#checks.x86_64-linux.nix-unit
+#
+# NOTE: Derivation comparison
+# nix-unit deeply forces both `expr` and `expected` (via forceValueDeep) before
+# comparing. The attrsets returned by `derivation` are self-referential, so
+# this causes stack overflow. We compare `.drvPath` instead where needed, like
+# `==` does when `.type == "derivation"`.
+
+{ flake-parts }:
+let
+  nixpkgs = flake-parts.inputs.nixpkgs;
+  f-p-lib = flake-parts.lib;
+  inherit (f-p-lib) mkFlake;
+  inherit (flake-parts.inputs.nixpkgs-lib) lib;
+
+  pkg = system: name:
+    derivation
+      {
+        name = name;
+        builder = "no-builder";
+        system = system;
+      }
+    // {
+      meta = {
+        mainProgram = name;
+      };
+    };
+
+  empty = mkFlake
+    { inputs.self = { }; }
+    {
+      systems = [ ];
+    };
+
+  emptyExposeArgs = mkFlake
+    { inputs.self = { outPath = "the self outpath"; }; }
+    ({ config, moduleLocation, ... }: {
+      flake = {
+        inherit moduleLocation;
+      };
+    });
+
+  emptyExposeArgsNoSelf = mkFlake
+    { inputs.self = throw "self won't be available in case of some errors"; }
+    ({ config, moduleLocation, ... }: {
+      flake = {
+        inherit moduleLocation;
+      };
+    });
+
+  example1 = mkFlake
+    { inputs.self = { }; }
+    {
+      systems = [ "a" "b" ];
+      perSystem = { config, system, ... }: {
+        packages.hello = pkg system "hello";
+        apps.hello.program = config.packages.hello;
+      };
+    };
+
+  packagesNonStrictInDevShells = mkFlake
+    { inputs.self = packagesNonStrictInDevShells; /* approximation */ }
+    {
+      systems = [ "a" "b" ];
+      perSystem = { system, self', ... }: {
+        packages.hello = pkg system "hello";
+        packages.default = self'.packages.hello;
+        devShells = throw "can't be strict in perSystem.devShells!";
+      };
+      flake.devShells = throw "can't be strict in devShells!";
+    };
+
+  easyOverlay = mkFlake
+    { inputs.self = { }; }
+    {
+      imports = [ flake-parts.flakeModules.easyOverlay ];
+      systems = [ "a" "aarch64-linux" ];
+      perSystem = { system, config, final, pkgs, ... }: {
+        packages.default = config.packages.hello;
+        packages.hello = pkg system "hello";
+        packages.hello_new = final.hello;
+        overlayAttrs = {
+          hello = config.packages.hello;
+          hello_old = pkgs.hello;
+          hello_new = config.packages.hello_new;
+        };
+      };
+    };
+
+  bundlersExample = mkFlake
+    { inputs.self = { }; }
+    {
+      imports = [ flake-parts.flakeModules.bundlers ];
+      systems = [ "a" "b" ];
+      perSystem = { system, ... }: {
+        packages.hello = pkg system "hello";
+        bundlers.toTarball = drv: pkg system "tarball-${drv.name}";
+        bundlers.toAppImage = drv: pkg system "appimage-${drv.name}";
+      };
+    };
+
+  modulesFlake =
+    mkFlake
+      {
+        inputs.self = { };
+        moduleLocation = "modulesFlake";
+      }
+      {
+        imports = [ flake-parts.flakeModules.modules ];
+        options = {
+          # Test option that uses plain types.submodule
+          flake.fooConfiguration = lib.mkOption {
+            type = lib.types.submoduleWith {
+              # Just Like types.submodule;
+              shorthandOnlyDefinesConfig = true;
+              class = "foo";
+              modules = [ ];
+            };
+          };
+        };
+        config = {
+          systems = [ ];
+          flake = {
+            modules.generic.example =
+              { lib, ... }:
+              {
+                options.generic.example = lib.mkOption { default = "works in any module system application"; };
+              };
+            modules.foo.example =
+              { lib, ... }:
+              {
+                options.foo.example = lib.mkOption { default = "works in foo application"; };
+              };
+            fooConfiguration = modulesFlake.modules.foo.example;
+          };
+        };
+      };
+
+  flakeModulesDeclare = mkFlake
+    { inputs.self = { outPath = ./.; }; }
+    ({ config, ... }: {
+      imports = [ flake-parts.flakeModules.flakeModules ];
+      systems = [ ];
+      flake.flakeModules.default = { lib, ... }: {
+        options.flake.test123 = lib.mkOption { default = "option123"; };
+        imports = [ config.flake.flakeModules.extra ];
+      };
+      flake.flakeModules.extra = {
+        flake.test123 = "123test";
+      };
+    });
+
+  flakeModulesImport = mkFlake
+    { inputs.self = { }; }
+    {
+      imports = [ flakeModulesDeclare.flakeModules.default ];
+    };
+
+  flakeModulesDisable = mkFlake
+    { inputs.self = { }; }
+    {
+      imports = [ flakeModulesDeclare.flakeModules.default ];
+      disabledModules = [ flakeModulesDeclare.flakeModules.extra ];
+    };
+
+  nixpkgsWithoutEasyOverlay = import nixpkgs {
+    system = "x86_64-linux";
+    overlays = [ ];
+    config = { };
+  };
+
+  nixpkgsWithEasyOverlay = import nixpkgs {
+    # non-memoized
+    system = "x86_64-linux";
+    overlays = [ easyOverlay.overlays.default ];
+    config = { };
+  };
+
+  nixpkgsWithEasyOverlayMemoized = import nixpkgs {
+    # memoized
+    system = "aarch64-linux";
+    overlays = [ easyOverlay.overlays.default ];
+    config = { };
+  };
+
+  specialArgFlake = mkFlake
+    {
+      inputs.self = { };
+      specialArgs.soSpecial = true;
+    }
+    ({ soSpecial, ... }: {
+      imports = assert soSpecial; [ ];
+      flake.foo = true;
+    });
+
+  partitionWithoutExtraInputsFlake = mkFlake
+    {
+      inputs.self = { };
+    }
+    ({ config, ... }: {
+      imports = [ flake-parts.flakeModules.partitions ];
+      systems = [ "x86_64-linux" ];
+      partitions.dev.module = { inputs, ... }: builtins.seq inputs { };
+      partitionedAttrs.devShells = "dev";
+    });
+
+  nixosModulesFlake = mkFlake
+    {
+      inputs.self = { outPath = "/test/path"; };
+    }
+    {
+      systems = [ ];
+      flake.nixosModules.example = { lib, ... }: {
+        options.test.option = lib.mkOption { default = "nixos-test"; };
+      };
+    };
+
+  dogfoodProvider = mkFlake
+    { inputs.self = { }; }
+    ({ flake-parts-lib, ... }: {
+      imports = [
+        (flake-parts-lib.importAndPublish "dogfood" { flake.marker = "dogfood"; })
+      ];
+    });
+
+  dogfoodConsumer = mkFlake
+    { inputs.self = { }; }
+    ({ flake-parts-lib, ... }: {
+      imports = [
+        dogfoodProvider.modules.flake.dogfood
+      ];
+    });
+
+in
+{
+  empty = {
+    "test: empty flake outputs" = {
+      expr = empty;
+      expected = {
+        apps = { };
+        checks = { };
+        devShells = { };
+        formatter = { };
+        legacyPackages = { };
+        nixosConfigurations = { };
+        nixosModules = { };
+        overlays = { };
+        packages = { };
+      };
+    };
+  };
+
+  example1 = {
+    "test: full flake output with two systems" = {
+      expr = example1;
+      expected = {
+        apps = {
+          a = {
+            hello = {
+              program = "${pkg "a" "hello"}/bin/hello";
+              type = "app";
+              meta = { };
+            };
+          };
+          b = {
+            hello = {
+              program = "${pkg "b" "hello"}/bin/hello";
+              type = "app";
+              meta = { };
+            };
+          };
+        };
+        checks = { a = { }; b = { }; };
+        devShells = { a = { }; b = { }; };
+        formatter = { };
+        legacyPackages = { a = { }; b = { }; };
+        nixosConfigurations = { };
+        nixosModules = { };
+        overlays = { };
+        packages = {
+          a = { hello = pkg "a" "hello"; };
+          b = { hello = pkg "b" "hello"; };
+        };
+      };
+    };
+  };
+
+  bundlers = {
+    "test: toTarball bundler" = {
+      expr = bundlersExample.bundlers.a.toTarball (pkg "a" "hello");
+      expected = pkg "a" "tarball-hello";
+    };
+    "test: toAppImage bundler" = {
+      expr = bundlersExample.bundlers.b.toAppImage (pkg "b" "hello");
+      expected = pkg "b" "appimage-hello";
+    };
+  };
+
+  easyOverlay = {
+    "test: exported package in overlay, perSystem invoked for non-memoized system" = {
+      expr = nixpkgsWithEasyOverlay.hello;
+      expected = pkg "x86_64-linux" "hello";
+    };
+
+    "test: exported package in overlay, perSystem invoked for memoized system" = {
+      expr = nixpkgsWithEasyOverlayMemoized.hello;
+      expected = pkg "aarch64-linux" "hello";
+    };
+
+    "test: non-exported package not in overlay" = {
+      expr = nixpkgsWithEasyOverlay.default or null != pkg "x86_64-linux" "hello";
+      expected = true;
+    };
+
+    "test: hello_old comes from super" = {
+      expr = nixpkgsWithEasyOverlay.hello_old.drvPath;
+      # See NOTE: Derivation comparison
+      expected = nixpkgsWithoutEasyOverlay.hello.drvPath;
+    };
+
+    "test: hello_new uses final wiring" = {
+      expr = nixpkgsWithEasyOverlay.hello_new.drvPath;
+      # See NOTE: Derivation comparison
+      expected = nixpkgsWithEasyOverlay.hello.drvPath;
+    };
+  };
+
+  flakeModules = {
+    "test: import flakeModule" = {
+      expr = flakeModulesImport.test123;
+      expected = "123test";
+    };
+
+    "test: disable flakeModule" = {
+      expr = flakeModulesDisable.test123;
+      expected = "option123";
+    };
+  };
+
+  "test: packages not strict in devShells" = {
+    expr = packagesNonStrictInDevShells.packages.a.default;
+    expected = pkg "a" "hello";
+  };
+
+  "test: moduleLocation from self outPath" = {
+    expr = emptyExposeArgs.moduleLocation;
+    expected = "the self outpath/flake.nix";
+  };
+
+  modules = {
+    "test: generic module in arbitrary class" = {
+      expr = (lib.evalModules {
+        class = "barrr";
+        modules = [
+          modulesFlake.modules.generic.example
+        ];
+      }).config.generic.example;
+      expected = "works in any module system application";
+    };
+
+    "test: foo module in foo class" = {
+      expr = (lib.evalModules {
+        class = "foo";
+        modules = [
+          modulesFlake.modules.foo.example
+        ];
+      }).config.foo.example;
+      expected = "works in foo application";
+    };
+
+    "test: modules in submodule with shorthandOnlyDefinesConfig" = {
+      expr = modulesFlake.fooConfiguration.foo.example;
+      expected = "works in foo application";
+    };
+  };
+
+  "test: specialArgs passed to module" = {
+    expr = specialArgFlake.foo;
+    expected = true;
+  };
+
+  "test: partition without extra inputs" = {
+    expr = builtins.isAttrs partitionWithoutExtraInputsFlake.devShells.x86_64-linux;
+    expected = true;
+  };
+
+  nixosModules = {
+    "test: nixosModule has _class nixos" = {
+      expr = nixosModulesFlake.nixosModules.example._class;
+      expected = "nixos";
+    };
+
+    "test: nixosModule has correct _file" = {
+      expr = nixosModulesFlake.nixosModules.example._file;
+      expected = "/test/path/flake.nix#nixosModules.example";
+    };
+
+    "test: nixosModule evaluates correctly" = {
+      expr = (lib.evalModules {
+        class = "nixos";
+        modules = [
+          nixosModulesFlake.nixosModules.example
+        ];
+      }).config.test.option;
+      expected = "nixos-test";
+    };
+  };
+
+  dogfood = {
+    "test: importAndPublish provider" = {
+      expr = dogfoodProvider.marker;
+      expected = "dogfood";
+    };
+
+    "test: importAndPublish consumer" = {
+      expr = dogfoodConsumer.marker;
+      expected = "dogfood";
+    };
+  };
+}

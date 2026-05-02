@@ -42,6 +42,8 @@
       let tests = import ./tests/eval-tests.nix { flake-parts = self; };
       in tests.runTests pkgs.emptyFile // { internals = tests; };
 
+    nix-unit.tests = import ./tests/nix-unit.nix { flake-parts = self; };
+
     # nix-unit evaluates the flake, which triggers the dev partition via
     # flake-compat, requiring network to fetch dev inputs.
     nix-unit.allowNetwork = true;
