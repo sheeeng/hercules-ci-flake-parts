@@ -44,14 +44,6 @@ let
       };
     });
 
-  emptyExposeArgsNoSelf = mkFlake
-    { inputs.self = throw "self won't be available in case of some errors"; }
-    ({ config, moduleLocation, ... }: {
-      flake = {
-        inherit moduleLocation;
-      };
-    });
-
   example1 = mkFlake
     { inputs.self = { }; }
     {
