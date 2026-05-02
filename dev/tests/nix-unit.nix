@@ -44,6 +44,14 @@ let
       };
     });
 
+  # Originally tested errorLocation (removed in c8c8e56). Repurposed to test
+  # that mkFlake can produce standard outputs without forcing self.
+  emptyExposeArgsNoSelf = mkFlake
+    { inputs.self = throw "self won't be available in case of some errors"; }
+    {
+      systems = [ ];
+    };
+
   example1 = mkFlake
     { inputs.self = { }; }
     {
@@ -227,8 +235,51 @@ let
       ];
     });
 
+  withSystemFlake = mkFlake
+    { inputs.self = { }; }
+    ({ withSystem, ... }: {
+      systems = [ "a" "b" ];
+      perSystem = { system, ... }: {
+        packages.hello = pkg system "hello";
+      };
+      flake.withSystem = withSystem;
+    });
+
 in
 {
+  "test: mkFlake does not force self" = {
+    expr = emptyExposeArgsNoSelf;
+    expected = {
+      apps = { };
+      checks = { };
+      devShells = { };
+      formatter = { };
+      legacyPackages = { };
+      nixosConfigurations = { };
+      nixosModules = { };
+      overlays = { };
+      packages = { };
+    };
+  };
+
+  withSystem = {
+    "test: withSystem provides the right system for undeclared system" = {
+      expr = withSystemFlake.withSystem "foo" ({ system, ... }: system);
+      expected = "foo";
+    };
+    "test: withSystem provides perSystem config for undeclared system" = {
+      expr = withSystemFlake.withSystem "foo" ({ config, ... }: config.packages.hello);
+      expected = pkg "foo" "hello";
+    };
+    "test: withSystem provides the right system for declared system" = {
+      expr = withSystemFlake.withSystem "a" ({ system, ... }: system);
+      expected = "a";
+    };
+    "test: withSystem provides perSystem config for declared system" = {
+      expr = withSystemFlake.withSystem "a" ({ config, ... }: config.packages.hello);
+      expected = pkg "a" "hello";
+    };
+  };
   empty = {
     "test: empty flake outputs" = {
       expr = empty;
