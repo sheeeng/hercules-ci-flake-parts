@@ -42,6 +42,10 @@
       let tests = import ./tests/eval-tests.nix { flake-parts = self; };
       in tests.runTests pkgs.emptyFile // { internals = tests; };
 
+    checks.perSystem-memoize = pkgs.callPackage ./tests/perSystem-memoize.nix {
+      flake-parts = self;
+    };
+
     nix-unit.tests = import ./tests/nix-unit.nix { flake-parts = self; };
 
     # nix-unit evaluates the flake, which triggers the dev partition via
