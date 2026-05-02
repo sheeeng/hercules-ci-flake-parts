@@ -38,10 +38,6 @@
       };
     };
 
-    checks.eval-tests =
-      let tests = import ./tests/eval-tests.nix { flake-parts = self; };
-      in tests.runTests pkgs.emptyFile // { internals = tests; };
-
     checks.perSystem-memoize = pkgs.callPackage ./tests/perSystem-memoize.nix {
       flake-parts = self;
     };

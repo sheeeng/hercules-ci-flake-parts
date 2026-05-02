@@ -1,4 +1,4 @@
-# Tests in nix-unit format, ported from eval-tests.nix
+# Tests in nix-unit format
 # Run with:
 #   nix-unit --flake .#tests
 # or:
