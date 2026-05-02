@@ -4,6 +4,7 @@
   imports = [
     inputs.pre-commit-hooks-nix.flakeModule
     inputs.hercules-ci-effects.flakeModule # herculesCI attr
+    inputs.nix-unit.modules.flake.default
   ];
   systems = [ "x86_64-linux" "aarch64-darwin" ];
 
@@ -21,6 +22,7 @@
 
     devShells.default = pkgs.mkShell {
       nativeBuildInputs = [
+        config.nix-unit.package
         pkgs.nixpkgs-fmt
         pkgs.hci
       ];
@@ -39,6 +41,10 @@
     checks.eval-tests =
       let tests = import ./tests/eval-tests.nix { flake-parts = self; };
       in tests.runTests pkgs.emptyFile // { internals = tests; };
+
+    # nix-unit evaluates the flake, which triggers the dev partition via
+    # flake-compat, requiring network to fetch dev inputs.
+    nix-unit.allowNetwork = true;
 
   };
   flake = {

@@ -59,6 +59,7 @@
       partitionedAttrs.checks = "dev";
       partitionedAttrs.devShells = "dev";
       partitionedAttrs.herculesCI = "dev";
+      partitionedAttrs.tests = "dev";
       partitions.dev.extraInputsFlake = ./dev;
       partitions.dev.module = {
         imports = [ ./dev/flake-module.nix ];
