@@ -45,8 +45,7 @@
           '';
         };
       };
-      flakeModules = {
-        # Built-in modules
+      builtinModules = {
         apps = ./modules/apps.nix;
         checks = ./modules/checks.nix;
         debug = ./modules/debug.nix;
@@ -63,8 +62,8 @@
         perSystem = ./modules/perSystem.nix;
         transposition = ./modules/transposition.nix;
         withSystem = ./modules/withSystem.nix;
-
-        # Extras
+      };
+      extraModules = {
         easyOverlay = ./extras/easyOverlay.nix;
         flakeModules = ./extras/flakeModules.nix;
         modules = ./extras/modules.nix;
@@ -72,6 +71,7 @@
         bundlers = ./extras/bundlers.nix;
         touchup = ./extras/touchup.nix;
       };
+      flakeModules = builtinModules // extraModules;
     in
     lib.mkFlake { inherit inputs; } {
       systems = [ ];
