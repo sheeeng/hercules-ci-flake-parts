@@ -1,4 +1,4 @@
-# Tests in: ../dev/tests/eval-tests.nix (bundlersExample)
+# Tests in: ../dev/tests/nix-unit.nix (bundlersExample)
 
 { lib
 , flake-parts-lib

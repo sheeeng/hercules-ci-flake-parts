@@ -51,6 +51,7 @@
         modules = ./extras/modules.nix;
         partitions = ./extras/partitions.nix;
         bundlers = ./extras/bundlers.nix;
+        touchup = ./extras/touchup.nix;
       };
     in
     lib.mkFlake { inherit inputs; } {
@@ -59,6 +60,7 @@
       partitionedAttrs.checks = "dev";
       partitionedAttrs.devShells = "dev";
       partitionedAttrs.herculesCI = "dev";
+      partitionedAttrs.tests = "dev";
       partitions.dev.extraInputsFlake = ./dev;
       partitions.dev.module = {
         imports = [ ./dev/flake-module.nix ];

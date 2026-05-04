@@ -159,7 +159,7 @@ let
       let
         eval = flake-parts-lib.evalFlakeModule args module;
       in
-      eval.config.flake;
+      eval.config.processedFlake;
 
     /**
       Deprecated. Declare options directly, e.g. `options.foo.bar = mkOption { ... }`,
