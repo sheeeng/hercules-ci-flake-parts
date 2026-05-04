@@ -46,6 +46,25 @@
         };
       };
       flakeModules = {
+        # Built-in modules
+        apps = ./modules/apps.nix;
+        checks = ./modules/checks.nix;
+        debug = ./modules/debug.nix;
+        devShells = ./modules/devShells.nix;
+        flake = ./modules/flake.nix;
+        formatter = ./modules/formatter.nix;
+        legacyPackages = ./modules/legacyPackages.nix;
+        moduleWithSystem = ./modules/moduleWithSystem.nix;
+        nixosConfigurations = ./modules/nixosConfigurations.nix;
+        nixosModules = ./modules/nixosModules.nix;
+        nixpkgs = ./modules/nixpkgs.nix;
+        overlays = ./modules/overlays.nix;
+        packages = ./modules/packages.nix;
+        perSystem = ./modules/perSystem.nix;
+        transposition = ./modules/transposition.nix;
+        withSystem = ./modules/withSystem.nix;
+
+        # Extras
         easyOverlay = ./extras/easyOverlay.nix;
         flakeModules = ./extras/flakeModules.nix;
         modules = ./extras/modules.nix;
