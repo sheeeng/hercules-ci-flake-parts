@@ -9,6 +9,7 @@
     let
       lib = import ./lib.nix {
         inherit (nixpkgs-lib) lib;
+        inherit builtinModules extraModules;
         # Extra info for version check message
         revInfo =
           if nixpkgs-lib?rev

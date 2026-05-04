@@ -1,4 +1,6 @@
 { lib
+, builtinModules
+, extraModules
   # Optionally a string with extra version info to be included in the error message
   # in case is lib is out of date. Empty or starts with space.
 , revInfo ? ""
@@ -139,7 +141,7 @@ let
             inherit self flake-parts-lib moduleLocation;
             inputs = args.inputs or /* legacy, warned above */ self.inputs;
           } // specialArgs;
-          modules = [ ./all-modules.nix (lib.setDefaultModuleLocation errorLocation module) ];
+          modules = builtins.attrValues builtinModules ++ [ (lib.setDefaultModuleLocation errorLocation module) ];
           class = "flake";
         }
         );
@@ -294,7 +296,7 @@ let
       _class = "flake";
       imports = [
         module
-        ./extras/modules.nix
+        extraModules.modules
       ];
       flake.modules.flake.${name} = module;
     };
