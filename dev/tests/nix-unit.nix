@@ -567,6 +567,31 @@ in
     };
   };
 
+  perInput = {
+    "test: inputs' does not evaluate input flake formatter" =
+      let
+        inputFlake = {
+          _type = "flake";
+          outPath = "/fake";
+          formatter = throw "must not evaluate input's formatter";
+          packages.a.hello = pkg "a" "hello";
+        };
+        self = { _type = "flake"; outPath = "/test"; inputs = { inherit self; dep = inputFlake; }; };
+        result = mkFlake
+          { inputs = self.inputs; }
+          {
+            systems = [ "a" ];
+            perSystem = { inputs', ... }: {
+              packages.default = inputs'.dep.packages.hello;
+            };
+          };
+      in
+      {
+        expr = (result.packages.a.default).name;
+        expected = "hello";
+      };
+  };
+
   formatter = {
     "test: conditional null throws helpful error" = {
       expr =

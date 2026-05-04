@@ -100,10 +100,9 @@ in
               '')
           config.allSystems);
 
-    perInput = system: flake:
-      optionalAttrs (flake?formatter.${system}) {
-        formatter = flake.formatter.${system};
-      };
+    perInput = system: flake: {
+      formatter = flake.formatter.${system};
+    };
 
   };
 }
