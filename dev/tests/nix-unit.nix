@@ -162,6 +162,13 @@ let
       };
     });
 
+  disableBuiltinModule = mod: mkFlake
+    { inputs.self = { }; }
+    {
+      systems = [ "x86_64-linux" ];
+      disabledModules = [ mod ];
+    };
+
   flakeModulesImport = mkFlake
     { inputs.self = { }; }
     {
@@ -389,6 +396,45 @@ in
     "test: disable flakeModule" = {
       expr = flakeModulesDisable.test123;
       expected = "option123";
+    };
+
+    # Basic module disable checks. These aren't particularly thorough, but since
+    # these "interface" modules don't tend to interact, that should be ok for now.
+    "test: disable built-in apps" = {
+      expr = builtins.attrNames (disableBuiltinModule flake-parts.flakeModules.apps);
+      expected = builtins.filter (n: n != "apps") (builtins.attrNames empty);
+    };
+    "test: disable built-in checks" = {
+      expr = builtins.attrNames (disableBuiltinModule flake-parts.flakeModules.checks);
+      expected = builtins.filter (n: n != "checks") (builtins.attrNames empty);
+    };
+    "test: disable built-in devShells" = {
+      expr = builtins.attrNames (disableBuiltinModule flake-parts.flakeModules.devShells);
+      expected = builtins.filter (n: n != "devShells") (builtins.attrNames empty);
+    };
+    "test: disable built-in formatter" = {
+      expr = builtins.attrNames (disableBuiltinModule flake-parts.flakeModules.formatter);
+      expected = builtins.filter (n: n != "formatter") (builtins.attrNames empty);
+    };
+    "test: disable built-in legacyPackages" = {
+      expr = builtins.attrNames (disableBuiltinModule flake-parts.flakeModules.legacyPackages);
+      expected = builtins.filter (n: n != "legacyPackages") (builtins.attrNames empty);
+    };
+    "test: disable built-in nixosConfigurations" = {
+      expr = builtins.attrNames (disableBuiltinModule flake-parts.flakeModules.nixosConfigurations);
+      expected = builtins.filter (n: n != "nixosConfigurations") (builtins.attrNames empty);
+    };
+    "test: disable built-in nixosModules" = {
+      expr = builtins.attrNames (disableBuiltinModule flake-parts.flakeModules.nixosModules);
+      expected = builtins.filter (n: n != "nixosModules") (builtins.attrNames empty);
+    };
+    "test: disable built-in overlays" = {
+      expr = builtins.attrNames (disableBuiltinModule flake-parts.flakeModules.overlays);
+      expected = builtins.filter (n: n != "overlays") (builtins.attrNames empty);
+    };
+    "test: disable built-in packages" = {
+      expr = builtins.attrNames (disableBuiltinModule flake-parts.flakeModules.packages);
+      expected = builtins.filter (n: n != "packages") (builtins.attrNames empty);
     };
   };
 
